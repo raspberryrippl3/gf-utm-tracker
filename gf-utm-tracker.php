@@ -2,7 +2,7 @@
 /**
  * Plugin Name:       UTM Tracker for Gravity Forms
  * Description:       Captures UTM parameters, click IDs, landing page and referrer when a visitor arrives, keeps them across pages, and saves them with every Gravity Forms entry. Values are available as merge tags in notifications and confirmations and shown on the entry screen.
- * Version:           1.0.0
+ * Version:           1.1.0
  * Requires at least: 5.8
  * Requires PHP:      7.4
  * Author:            Tring Web Design
@@ -12,7 +12,7 @@
 
 defined( 'ABSPATH' ) || exit;
 
-define( 'GFUT_VERSION', '1.0.0' );
+define( 'GFUT_VERSION', '1.1.0' );
 define( 'GFUT_FILE', __FILE__ );
 define( 'GFUT_DIR', plugin_dir_path( __FILE__ ) );
 define( 'GFUT_URL', plugin_dir_url( __FILE__ ) );
@@ -28,8 +28,10 @@ class GFUT_Bootstrap {
 
 		GFForms::include_addon_framework();
 
+		require_once GFUT_DIR . 'includes/class-gfut-consent.php';
 		require_once GFUT_DIR . 'includes/class-gfut-tracker.php';
 
+		GFUT_Consent::init();
 		GFAddOn::register( 'GFUT_Tracker' );
 	}
 }

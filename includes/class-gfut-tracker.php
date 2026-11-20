@@ -191,8 +191,8 @@ class GFUT_Tracker extends GFAddOn {
 	}
 
 	/**
-	 * Whether to capture for this request. Filter `gfut_capture_enabled` to
-	 * tie capture to a cookie consent plugin.
+	 * Master switch. Filter `gfut_capture_enabled` to turn capture off.
+	 * Cookie consent is handled separately by GFUT_Consent.
 	 */
 	public function capture_enabled() {
 		return (bool) apply_filters( 'gfut_capture_enabled', true );
@@ -221,6 +221,7 @@ class GFUT_Tracker extends GFAddOn {
 					'attribution' => $this->get_attribution(),
 					'params'      => array_keys( $this->get_url_params() ),
 					'maxLength'   => self::MAX_LENGTH,
+					'consent'     => GFUT_Consent::script_config(),
 				)
 			) . ';',
 			'before'
@@ -232,7 +233,7 @@ class GFUT_Tracker extends GFAddOn {
 	 * Uses the same rules as the browser script.
 	 */
 	public function capture_server_side() {
-		if ( is_admin() || wp_doing_ajax() || headers_sent() || ! $this->capture_enabled() ) {
+		if ( is_admin() || wp_doing_ajax() || headers_sent() || ! $this->capture_enabled() || ! GFUT_Consent::has_consent() ) {
 			return;
 		}
 

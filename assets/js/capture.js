@@ -94,23 +94,90 @@
 			pad(d.getUTCHours()) + ':' + pad(d.getUTCMinutes()) + ':' + pad(d.getUTCSeconds());
 	}
 
-	var existing = readCookie();
-	var fromUrl = getParams();
-	var hasCampaign = Object.keys(fromUrl).length > 0;
+	var captured = false;
 
-	// Keep what we have when this visit carries no campaign, or when the site
-	// uses first-touch attribution.
-	if (existing && (!hasCampaign || cfg.attribution === 'first')) {
+	function capture() {
+		if (captured) {
+			return;
+		}
+		captured = true;
+
+		var existing = readCookie();
+		var fromUrl = getParams();
+		var hasCampaign = Object.keys(fromUrl).length > 0;
+
+		// Keep what we have when this visit carries no campaign, or when the
+		// site uses first-touch attribution.
+		if (existing && (!hasCampaign || cfg.attribution === 'first')) {
+			return;
+		}
+
+		var data = fromUrl;
+		data.landing_page = (window.location.origin + window.location.pathname + window.location.search).substring(0, maxLen * 2);
+		var ref = externalReferrer();
+		if (ref) {
+			data.referrer = ref;
+		}
+		data.visit_time = utcNow();
+
+		writeCookie(data);
+	}
+
+	function forget() {
+		captured = false;
+		document.cookie = cfg.cookie + '=; path=/; max-age=0; SameSite=Lax';
+	}
+
+	/* ---- Consent ---- */
+
+	var consent = cfg.consent || { provider: 'none' };
+	var category = consent.category;
+
+	// The cookie banner's scanner needs to see the cookie in order to list it.
+	if (window.__cbpScanHook || consent.provider === 'none') {
+		capture();
 		return;
 	}
 
-	var data = fromUrl;
-	data.landing_page = (window.location.origin + window.location.pathname + window.location.search).substring(0, maxLen * 2);
-	var ref = externalReferrer();
-	if (ref) {
-		data.referrer = ref;
+	if (consent.provider === 'cbp') {
+		// The banner fires cbp:consent on every page load once a choice is
+		// saved, and again whenever the visitor changes it.
+		document.addEventListener('cbp:consent', function (e) {
+			var cats = e && e.detail && e.detail.categories;
+			if (cats && cats[category] === true) {
+				capture();
+			} else {
+				forget();
+			}
+		});
+		// After a scan the banner may hold this script back until consent and
+		// run it afterwards, once that event has already fired: ask directly.
+		if (window.CBP && typeof window.CBP.hasConsent === 'function' && window.CBP.hasConsent(category)) {
+			capture();
+		}
+		return;
 	}
-	data.visit_time = utcNow();
 
-	writeCookie(data);
+	if (consent.provider === 'wpconsent') {
+		var check = function () {
+			if (typeof window.wp_has_consent === 'function' && window.wp_has_consent(category)) {
+				capture();
+			}
+		};
+		if (document.readyState === 'loading') {
+			document.addEventListener('DOMContentLoaded', check);
+		} else {
+			check();
+		}
+		document.addEventListener('wp_listen_for_consent_change', function (e) {
+			var changed = e && e.detail;
+			if (changed && Object.prototype.hasOwnProperty.call(changed, category)) {
+				if (changed[category] === 'allow') {
+					capture();
+				} else {
+					forget();
+				}
+			}
+		});
+	}
 })(window, document);
